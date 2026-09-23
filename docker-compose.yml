@@ -1,0 +1,13 @@
+services:
+  chromium:
+    build:
+      context: ./server
+    container_name: cp-remote-chromium
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      PORT: 3000
+      ACCESS_TOKEN: cp-demo-2026
