@@ -253,7 +253,7 @@ app.post("/reload", checkToken, async (req, res) => {
 
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
 
   console.log(
     `CP Remote Chromium running on port ${PORT}`
