@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-
 <title>CP Remote Chrome</title>
 
 <style>
@@ -32,7 +31,7 @@ body{
   color:#fff;
   border:1px solid #777;
   border-radius:4px;
-  padding:5px;
+  padding:5px 8px;
   font-size:13px;
 }
 
@@ -40,6 +39,7 @@ body{
   display:flex;
   gap:4px;
   margin-top:5px;
+  flex-wrap:wrap;
 }
 
 button{
@@ -47,7 +47,7 @@ button{
   color:#fff;
   border:1px solid #777;
   border-radius:4px;
-  padding:6px 8px;
+  padding:6px 9px;
   font-size:12px;
 }
 
@@ -55,17 +55,23 @@ button:focus{
   outline:2px solid #8ab4f8;
 }
 
+#start{
+  background:#1a73e8;
+}
+
 #status{
-  height:22px;
-  padding:4px 6px;
+  height:24px;
+  padding:5px 7px;
   background:#181818;
   color:#aaa;
   font-size:10px;
+  overflow:hidden;
+  white-space:nowrap;
 }
 
 #screenBox{
   width:100%;
-  height:calc(100vh - 105px);
+  height:calc(100vh - 110px);
   background:#000;
   display:flex;
   justify-content:center;
@@ -81,12 +87,6 @@ button:focus{
   display:block;
   background:#fff;
   user-select:none;
-  -webkit-user-drag:none;
-}
-
-#start{
-  background:#1a73e8;
-  border-color:#1a73e8;
 }
 </style>
 </head>
@@ -99,8 +99,8 @@ button:focus{
   id="url"
   type="text"
   value="https://www.google.com/"
-  placeholder="Enter URL"
-/>
+  placeholder="Enter website URL"
+>
 
 <div id="buttons">
 
@@ -112,11 +112,11 @@ START
 GO
 </button>
 
-<button onclick="back()">
+<button onclick="goBack()">
 BACK
 </button>
 
-<button onclick="forward()">
+<button onclick="goForward()">
 NEXT
 </button>
 
@@ -133,8 +133,9 @@ Remote Chromium offline
 </div>
 
 <div id="screenBox">
-  <img id="screen" src="" alt="Remote Chromium">
+<img id="screen" src="" alt="">
 </div>
+
 
 <script>
 
@@ -154,27 +155,175 @@ const statusBox =
 document.getElementById("status");
 
 let running = false;
+let refreshTimer = null;
 
-let refreshing = false;
+
+// ========================================
+// START REMOTE CHROMIUM
+// ========================================
+
+async function startBrowser(){
+
+  try{
+
+    statusBox.textContent =
+      "Starting Remote Chromium...";
+
+    const response =
+      await fetch(
+        SERVER +
+        "/start?token=" +
+        encodeURIComponent(TOKEN),
+        {
+          method:"GET",
+          cache:"no-store"
+        }
+      );
+
+    const text =
+      await response.text();
+
+    if(!response.ok){
+
+      throw new Error(text);
+    }
+
+    const data =
+      JSON.parse(text);
+
+    if(data.success !== true){
+
+      throw new Error(
+        data.error ||
+        "Browser start failed"
+      );
+    }
+
+    running = true;
+
+    statusBox.textContent =
+      "Remote Chromium: ONLINE";
+
+    startAutoRefresh();
+
+    await refreshScreen();
+
+  }catch(error){
+
+    running = false;
+
+    statusBox.textContent =
+      "START ERROR: " +
+      error.message;
+
+  }
+
+}
 
 
-// --------------------------------
-// API
-// --------------------------------
+// ========================================
+// OPEN WEBSITE
+// ========================================
 
-async function api(path, method="GET", body=null){
+async function openURL(){
+
+  if(!running){
+
+    await startBrowser();
+
+    if(!running){
+      return;
+    }
+  }
+
+  let url =
+    urlInput.value.trim();
+
+  if(!url){
+
+    url =
+      "https://www.google.com/";
+  }
+
+  if(
+    !/^https?:\/\//i.test(url)
+  ){
+
+    url =
+      "https://" + url;
+  }
+
+  urlInput.value =
+    url;
+
+  try{
+
+    statusBox.textContent =
+      "Opening...";
+
+    const response =
+      await api(
+        "/open",
+        "POST",
+        {
+          url:url
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if(!response.ok){
+
+      throw new Error(
+        data.error ||
+        "Open failed"
+      );
+    }
+
+    statusBox.textContent =
+      "Remote: " + data.url;
+
+    await refreshScreen();
+
+  }catch(error){
+
+    statusBox.textContent =
+      "OPEN ERROR: " +
+      error.message;
+
+  }
+
+}
+
+
+// ========================================
+// API HELPER
+// ========================================
+
+async function api(
+  path,
+  method="GET",
+  body=null
+){
 
   const options = {
-    method: method,
+
+    method:method,
 
     headers:{
       "X-Access-Token":TOKEN
-    }
+    },
+
+    cache:"no-store"
+
   };
 
   if(body !== null){
 
-    options.headers["Content-Type"] =
+    options.headers[
+      "Content-Type"
+    ] =
       "application/json";
 
     options.body =
@@ -192,113 +341,91 @@ async function api(path, method="GET", body=null){
     const text =
       await response.text();
 
-    throw new Error(
-      text || response.status
-    );
+    throw new Error(text);
   }
 
   return response;
+
 }
 
 
-// --------------------------------
-// START
-// --------------------------------
+// ========================================
+// SCREENSHOT
+// ========================================
 
-async function startBrowser(){
-
-  try{
-
-    statusBox.textContent =
-      "Starting Remote Chromium...";
-
-    await api(
-      "/start",
-      "POST"
-    );
-
-    running = true;
-
-    statusBox.textContent =
-      "Remote Chromium: ONLINE";
-
-    startScreenRefresh();
-
-  }catch(error){
-
-    statusBox.textContent =
-      "START ERROR: " +
-      error.message;
-  }
-}
-
-
-// --------------------------------
-// OPEN URL
-// --------------------------------
-
-async function openURL(){
+async function refreshScreen(){
 
   if(!running){
-
-    await startBrowser();
-
-    if(!running){
-      return;
-    }
+    return;
   }
-
-  let url =
-    urlInput.value.trim();
-
-  if(!url){
-    url = "https://www.google.com/";
-  }
-
-  if(
-    !/^https?:\/\//i.test(url)
-  ){
-
-    url =
-      "https://" + url;
-  }
-
-  urlInput.value = url;
 
   try{
 
-    statusBox.textContent =
-      "Opening: " + url;
-
-    const result =
+    const response =
       await api(
-        "/open",
-        "POST",
-        {url:url}
+        "/screenshot"
       );
 
-    const data =
-      await result.json();
+    if(!response.ok){
 
-    statusBox.textContent =
-      "Remote: " + data.url;
+      throw new Error(
+        "Screenshot failed"
+      );
+    }
 
-    refreshScreen();
+    const blob =
+      await response.blob();
+
+    const imageURL =
+      URL.createObjectURL(blob);
+
+    screen.onload =
+      function(){
+
+        URL.revokeObjectURL(
+          imageURL
+        );
+
+      };
+
+    screen.src =
+      imageURL;
 
   }catch(error){
 
     statusBox.textContent =
-      "OPEN ERROR: " +
+      "SCREEN ERROR: " +
       error.message;
+
   }
+
 }
 
 
-// --------------------------------
-// BACK
-// --------------------------------
+// ========================================
+// AUTO SCREEN REFRESH
+// ========================================
 
-async function back(){
+function startAutoRefresh(){
+
+  if(refreshTimer !== null){
+    return;
+  }
+
+  refreshTimer =
+    setInterval(
+      refreshScreen,
+      2000
+    );
+
+}
+
+
+// ========================================
+// BACK
+// ========================================
+
+async function goBack(){
 
   if(!running){
     return;
@@ -311,21 +438,26 @@ async function back(){
       "POST"
     );
 
-    refreshScreen();
+    setTimeout(
+      refreshScreen,
+      300
+    );
 
   }catch(error){
 
     statusBox.textContent =
       "BACK ERROR";
+
   }
+
 }
 
 
-// --------------------------------
+// ========================================
 // FORWARD
-// --------------------------------
+// ========================================
 
-async function forward(){
+async function goForward(){
 
   if(!running){
     return;
@@ -338,19 +470,24 @@ async function forward(){
       "POST"
     );
 
-    refreshScreen();
+    setTimeout(
+      refreshScreen,
+      300
+    );
 
   }catch(error){
 
     statusBox.textContent =
       "NEXT ERROR";
+
   }
+
 }
 
 
-// --------------------------------
+// ========================================
 // RELOAD
-// --------------------------------
+// ========================================
 
 async function reloadPage(){
 
@@ -368,81 +505,24 @@ async function reloadPage(){
       "POST"
     );
 
-    refreshScreen();
+    setTimeout(
+      refreshScreen,
+      500
+    );
 
   }catch(error){
 
     statusBox.textContent =
       "RELOAD ERROR";
+
   }
+
 }
 
 
-// --------------------------------
-// SCREENSHOT
-// --------------------------------
-
-async function refreshScreen(){
-
-  if(!running){
-    return;
-  }
-
-  try{
-
-    const response =
-      await api(
-        "/screenshot"
-      );
-
-    const blob =
-      await response.blob();
-
-    const imageURL =
-      URL.createObjectURL(blob);
-
-    screen.onload = function(){
-
-      URL.revokeObjectURL(
-        imageURL
-      );
-    };
-
-    screen.src =
-      imageURL;
-
-  }catch(error){
-
-    statusBox.textContent =
-      "SCREEN ERROR";
-  }
-}
-
-
-// --------------------------------
-// AUTO REFRESH
-// --------------------------------
-
-function startScreenRefresh(){
-
-  if(refreshing){
-    return;
-  }
-
-  refreshing = true;
-
-  setInterval(
-    refreshScreen,
-    1800
-  );
-
-  refreshScreen();
-}
-
-
-// --------------------------------
-// REMOTE CLICK
-// --------------------------------
+// ========================================
+// REMOTE MOUSE CLICK
+// ========================================
 
 screen.addEventListener(
   "click",
@@ -455,6 +535,12 @@ screen.addEventListener(
     const rect =
       screen.getBoundingClientRect();
 
+    const width =
+      screen.naturalWidth || 1280;
+
+    const height =
+      screen.naturalHeight || 720;
+
     if(
       rect.width <= 0 ||
       rect.height <= 0
@@ -462,24 +548,22 @@ screen.addEventListener(
       return;
     }
 
-    const naturalWidth =
-      screen.naturalWidth || 1280;
-
-    const naturalHeight =
-      screen.naturalHeight || 720;
-
     const x =
-      (event.clientX - rect.left)
+      (
+        event.clientX -
+        rect.left
+      )
       *
-      naturalWidth
-      /
+      width /
       rect.width;
 
     const y =
-      (event.clientY - rect.top)
+      (
+        event.clientY -
+        rect.top
+      )
       *
-      naturalHeight
-      /
+      height /
       rect.height;
 
     try{
@@ -502,15 +586,16 @@ screen.addEventListener(
 
       statusBox.textContent =
         "CLICK ERROR";
+
     }
 
   }
 );
 
 
-// --------------------------------
-// KEYBOARD
-// --------------------------------
+// ========================================
+// KEYBOARD CONTROL
+// ========================================
 
 document.addEventListener(
   "keydown",
@@ -528,6 +613,7 @@ document.addEventListener(
         event.preventDefault();
 
         openURL();
+
       }
 
       return;
@@ -540,37 +626,14 @@ document.addEventListener(
     let key =
       event.key;
 
-    // Cloud Phone keypad
-    if(key === "Enter"){
-      key = "Enter";
-    }
-
-    if(key === "Backspace"){
-      key = "Backspace";
-    }
-
-    if(key === "ArrowUp"){
-      key = "ArrowUp";
-    }
-
-    if(key === "ArrowDown"){
-      key = "ArrowDown";
-    }
-
-    if(key === "ArrowLeft"){
-      key = "ArrowLeft";
-    }
-
-    if(key === "ArrowRight"){
-      key = "ArrowRight";
-    }
-
     try{
 
       await api(
         "/key",
         "POST",
-        {key:key}
+        {
+          key:key
+        }
       );
 
       setTimeout(
@@ -582,11 +645,90 @@ document.addEventListener(
 
       statusBox.textContent =
         "KEY ERROR";
+
     }
 
   }
 );
 
 
-// --------------------------------
-// QUICK
+// ========================================
+// URL ENTER
+// ========================================
+
+urlInput.addEventListener(
+  "keydown",
+  function(event){
+
+    if(
+      event.key === "Enter"
+    ){
+
+      event.preventDefault();
+
+      openURL();
+
+    }
+
+  }
+);
+
+
+// ========================================
+// KEYPAD SHORTCUTS
+// ========================================
+
+document.addEventListener(
+  "keydown",
+  function(event){
+
+    if(
+      document.activeElement ===
+      urlInput
+    ){
+      return;
+    }
+
+    if(event.key === "1"){
+
+      urlInput.value =
+        "https://www.google.com/";
+
+      openURL();
+
+    }
+
+    else if(event.key === "2"){
+
+      urlInput.value =
+        "https://www.youtube.com/";
+
+      openURL();
+
+    }
+
+    else if(event.key === "3"){
+
+      urlInput.value =
+        "https://web.whatsapp.com/";
+
+      openURL();
+
+    }
+
+    else if(event.key === "4"){
+
+      urlInput.value =
+        "https://www.facebook.com/";
+
+      openURL();
+
+    }
+
+  }
+);
+
+</script>
+
+</body>
+</html>
