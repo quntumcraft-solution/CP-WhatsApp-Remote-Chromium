@@ -55,8 +55,56 @@ app.get("/health", (req, res) => {
 });
 
 // Start Chromium
-app.post("/start", checkToken, async (req, res) => {
+app.get("/start", async (req, res) => {
   try {
+    const token = req.query.token;
+
+    if (token !== ACCESS_TOKEN) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    if (!browser) {
+      browser = await chromium.launch({
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu"
+        ]
+      });
+    }
+
+    if (!page) {
+      page = await browser.newPage({
+        viewport: {
+          width: 1280,
+          height: 720
+        },
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36"
+      });
+    }
+
+    await page.goto("https://www.google.com/", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    });
+
+    res.json({
+      success: true,
+      url: page.url()
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
     if (!browser) {
       browser = await chromium.launch({
         headless: true,
