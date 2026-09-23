@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+
 <title>CP Remote Chrome</title>
 
 <style>
@@ -15,58 +16,77 @@ body{
   background:#111;
   color:#fff;
   font-family:Arial,sans-serif;
-  font-size:16px;
+  font-size:14px;
+  overflow:hidden;
 }
 
 #top{
   background:#202124;
-  padding:8px;
-  border-bottom:1px solid #555;
+  padding:6px;
 }
 
 #url{
   width:100%;
-  height:38px;
+  height:34px;
   background:#303134;
   color:#fff;
   border:1px solid #777;
-  border-radius:5px;
-  padding:5px 8px;
-  font-size:14px;
+  border-radius:4px;
+  padding:5px;
+  font-size:13px;
 }
 
 #buttons{
   display:flex;
-  gap:5px;
-  margin-top:6px;
+  gap:4px;
+  margin-top:5px;
 }
 
 button{
   background:#303134;
   color:#fff;
   border:1px solid #777;
-  padding:7px 10px;
   border-radius:4px;
-  font-size:13px;
+  padding:6px 8px;
+  font-size:12px;
 }
 
-button:focus,
-input:focus{
+button:focus{
   outline:2px solid #8ab4f8;
 }
 
 #status{
-  padding:5px 8px;
+  height:22px;
+  padding:4px 6px;
   background:#181818;
   color:#aaa;
-  font-size:11px;
+  font-size:10px;
+}
+
+#screenBox{
+  width:100%;
+  height:calc(100vh - 105px);
+  background:#000;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  overflow:hidden;
 }
 
 #screen{
-  width:100%;
-  height:calc(100vh - 105px);
-  border:0;
+  max-width:100%;
+  max-height:100%;
+  width:auto;
+  height:auto;
+  display:block;
   background:#fff;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+
+#start{
+  background:#1a73e8;
+  border-color:#1a73e8;
 }
 </style>
 </head>
@@ -76,134 +96,497 @@ input:focus{
 <div id="top">
 
 <input
- id="url"
- type="text"
- value="https://web.whatsapp.com/"
- placeholder="Enter website URL"
->
+  id="url"
+  type="text"
+  value="https://www.google.com/"
+  placeholder="Enter URL"
+/>
 
 <div id="buttons">
-<button onclick="go()">GO</button>
-<button onclick="back()">BACK</button>
-<button onclick="forward()">NEXT</button>
-<button onclick="reload()">RELOAD</button>
+
+<button id="start" onclick="startBrowser()">
+START
+</button>
+
+<button onclick="openURL()">
+GO
+</button>
+
+<button onclick="back()">
+BACK
+</button>
+
+<button onclick="forward()">
+NEXT
+</button>
+
+<button onclick="reloadPage()">
+RELOAD
+</button>
+
 </div>
 
 </div>
 
 <div id="status">
-CP Remote Chrome
+Remote Chromium offline
 </div>
 
-<iframe
- id="screen"
- src="about:blank"
- allow="fullscreen; clipboard-read; clipboard-write"
-></iframe>
+<div id="screenBox">
+  <img id="screen" src="" alt="Remote Chromium">
+</div>
 
 <script>
 
-const input = document.getElementById("url");
-const frame = document.getElementById("screen");
-const statusBox = document.getElementById("status");
+const SERVER =
+"https://cp-whatsapp-remote-chromium.onrender.com";
 
-function cleanUrl(value){
+const TOKEN =
+"cp-demo-2026";
 
-  value = value.trim();
+const urlInput =
+document.getElementById("url");
 
-  if(!value){
-    return "https://www.google.com/";
+const screen =
+document.getElementById("screen");
+
+const statusBox =
+document.getElementById("status");
+
+let running = false;
+
+let refreshing = false;
+
+
+// --------------------------------
+// API
+// --------------------------------
+
+async function api(path, method="GET", body=null){
+
+  const options = {
+    method: method,
+
+    headers:{
+      "X-Access-Token":TOKEN
+    }
+  };
+
+  if(body !== null){
+
+    options.headers["Content-Type"] =
+      "application/json";
+
+    options.body =
+      JSON.stringify(body);
   }
 
-  if(!/^https?:\/\//i.test(value)){
-    value = "https://" + value;
+  const response =
+    await fetch(
+      SERVER + path,
+      options
+    );
+
+  if(!response.ok){
+
+    const text =
+      await response.text();
+
+    throw new Error(
+      text || response.status
+    );
   }
 
-  return value;
+  return response;
 }
 
-function go(){
 
-  const url = cleanUrl(input.value);
+// --------------------------------
+// START
+// --------------------------------
 
-  input.value = url;
-
-  frame.src = url;
-
-  statusBox.textContent = "Opening: " + url;
-}
-
-function back(){
+async function startBrowser(){
 
   try{
-    frame.contentWindow.history.back();
-  }catch(e){}
 
-}
+    statusBox.textContent =
+      "Starting Remote Chromium...";
 
-function forward(){
+    await api(
+      "/start",
+      "POST"
+    );
 
-  try{
-    frame.contentWindow.history.forward();
-  }catch(e){}
+    running = true;
 
-}
+    statusBox.textContent =
+      "Remote Chromium: ONLINE";
 
-function reload(){
+    startScreenRefresh();
 
-  try{
-    frame.contentWindow.location.reload();
-  }catch(e){
+  }catch(error){
 
-    frame.src = frame.src;
-
+    statusBox.textContent =
+      "START ERROR: " +
+      error.message;
   }
-
 }
 
-input.addEventListener("keydown",function(e){
 
-  if(e.key === "Enter"){
-    go();
-  }
+// --------------------------------
+// OPEN URL
+// --------------------------------
 
-});
+async function openURL(){
 
-document.addEventListener("keydown",function(e){
+  if(!running){
 
-  if(e.key === "Enter"){
-    if(document.activeElement !== input){
-      go();
+    await startBrowser();
+
+    if(!running){
+      return;
     }
   }
 
-  if(e.key === "1"){
-    input.value="https://web.whatsapp.com/";
-    go();
+  let url =
+    urlInput.value.trim();
+
+  if(!url){
+    url = "https://www.google.com/";
   }
 
-  if(e.key === "2"){
-    reload();
+  if(
+    !/^https?:\/\//i.test(url)
+  ){
+
+    url =
+      "https://" + url;
   }
 
-  if(e.key === "3"){
-    input.value="https://www.google.com/";
-    go();
+  urlInput.value = url;
+
+  try{
+
+    statusBox.textContent =
+      "Opening: " + url;
+
+    const result =
+      await api(
+        "/open",
+        "POST",
+        {url:url}
+      );
+
+    const data =
+      await result.json();
+
+    statusBox.textContent =
+      "Remote: " + data.url;
+
+    refreshScreen();
+
+  }catch(error){
+
+    statusBox.textContent =
+      "OPEN ERROR: " +
+      error.message;
+  }
+}
+
+
+// --------------------------------
+// BACK
+// --------------------------------
+
+async function back(){
+
+  if(!running){
+    return;
   }
 
-  if(e.key === "4"){
-    input.value="https://www.youtube.com/";
-    go();
+  try{
+
+    await api(
+      "/back",
+      "POST"
+    );
+
+    refreshScreen();
+
+  }catch(error){
+
+    statusBox.textContent =
+      "BACK ERROR";
+  }
+}
+
+
+// --------------------------------
+// FORWARD
+// --------------------------------
+
+async function forward(){
+
+  if(!running){
+    return;
   }
 
-  if(e.key === "5"){
-    input.value="https://www.facebook.com/";
-    go();
+  try{
+
+    await api(
+      "/forward",
+      "POST"
+    );
+
+    refreshScreen();
+
+  }catch(error){
+
+    statusBox.textContent =
+      "NEXT ERROR";
+  }
+}
+
+
+// --------------------------------
+// RELOAD
+// --------------------------------
+
+async function reloadPage(){
+
+  if(!running){
+    return;
   }
 
-});
+  try{
 
-</script>
+    statusBox.textContent =
+      "Reloading...";
 
-</body>
-</html>
+    await api(
+      "/reload",
+      "POST"
+    );
+
+    refreshScreen();
+
+  }catch(error){
+
+    statusBox.textContent =
+      "RELOAD ERROR";
+  }
+}
+
+
+// --------------------------------
+// SCREENSHOT
+// --------------------------------
+
+async function refreshScreen(){
+
+  if(!running){
+    return;
+  }
+
+  try{
+
+    const response =
+      await api(
+        "/screenshot"
+      );
+
+    const blob =
+      await response.blob();
+
+    const imageURL =
+      URL.createObjectURL(blob);
+
+    screen.onload = function(){
+
+      URL.revokeObjectURL(
+        imageURL
+      );
+    };
+
+    screen.src =
+      imageURL;
+
+  }catch(error){
+
+    statusBox.textContent =
+      "SCREEN ERROR";
+  }
+}
+
+
+// --------------------------------
+// AUTO REFRESH
+// --------------------------------
+
+function startScreenRefresh(){
+
+  if(refreshing){
+    return;
+  }
+
+  refreshing = true;
+
+  setInterval(
+    refreshScreen,
+    1800
+  );
+
+  refreshScreen();
+}
+
+
+// --------------------------------
+// REMOTE CLICK
+// --------------------------------
+
+screen.addEventListener(
+  "click",
+  async function(event){
+
+    if(!running){
+      return;
+    }
+
+    const rect =
+      screen.getBoundingClientRect();
+
+    if(
+      rect.width <= 0 ||
+      rect.height <= 0
+    ){
+      return;
+    }
+
+    const naturalWidth =
+      screen.naturalWidth || 1280;
+
+    const naturalHeight =
+      screen.naturalHeight || 720;
+
+    const x =
+      (event.clientX - rect.left)
+      *
+      naturalWidth
+      /
+      rect.width;
+
+    const y =
+      (event.clientY - rect.top)
+      *
+      naturalHeight
+      /
+      rect.height;
+
+    try{
+
+      await api(
+        "/click",
+        "POST",
+        {
+          x:Math.round(x),
+          y:Math.round(y)
+        }
+      );
+
+      setTimeout(
+        refreshScreen,
+        250
+      );
+
+    }catch(error){
+
+      statusBox.textContent =
+        "CLICK ERROR";
+    }
+
+  }
+);
+
+
+// --------------------------------
+// KEYBOARD
+// --------------------------------
+
+document.addEventListener(
+  "keydown",
+  async function(event){
+
+    if(
+      document.activeElement ===
+      urlInput
+    ){
+
+      if(
+        event.key === "Enter"
+      ){
+
+        event.preventDefault();
+
+        openURL();
+      }
+
+      return;
+    }
+
+    if(!running){
+      return;
+    }
+
+    let key =
+      event.key;
+
+    // Cloud Phone keypad
+    if(key === "Enter"){
+      key = "Enter";
+    }
+
+    if(key === "Backspace"){
+      key = "Backspace";
+    }
+
+    if(key === "ArrowUp"){
+      key = "ArrowUp";
+    }
+
+    if(key === "ArrowDown"){
+      key = "ArrowDown";
+    }
+
+    if(key === "ArrowLeft"){
+      key = "ArrowLeft";
+    }
+
+    if(key === "ArrowRight"){
+      key = "ArrowRight";
+    }
+
+    try{
+
+      await api(
+        "/key",
+        "POST",
+        {key:key}
+      );
+
+      setTimeout(
+        refreshScreen,
+        200
+      );
+
+    }catch(error){
+
+      statusBox.textContent =
+        "KEY ERROR";
+    }
+
+  }
+);
+
+
+// --------------------------------
+// QUICK
