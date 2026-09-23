@@ -8,6 +8,7 @@ const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "cp-demo-2026";
 
 app.use(express.json({ limit: "1mb" }));
 
+// CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -26,9 +27,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Browser state
 let browser = null;
 let page = null;
 
+// Token check
 function checkToken(req, res, next) {
   const token =
     req.headers["x-access-token"] ||
@@ -43,7 +46,6 @@ function checkToken(req, res, next) {
   next();
 }
 
-
 // HOME
 app.get("/", (req, res) => {
   res.json({
@@ -52,14 +54,12 @@ app.get("/", (req, res) => {
   });
 });
 
-
 // HEALTH
 app.get("/health", (req, res) => {
   res.json({
     status: "ok"
   });
 });
-
 
 // TEST
 app.get("/test", (req, res) => {
@@ -69,11 +69,11 @@ app.get("/test", (req, res) => {
   });
 });
 
-
-// START
+// START BROWSER
 app.get("/start", checkToken, async (req, res) => {
   try {
 
+    // Launch Chromium
     if (!browser) {
       browser = await chromium.launch({
         headless: true,
@@ -81,26 +81,28 @@ app.get("/start", checkToken, async (req, res) => {
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-gpu"
+          "--disable-gpu",
+          "--disable-software-rasterizer"
         ]
       });
     }
 
+    // Create page
     if (!page) {
       page = await browser.newPage({
         viewport: {
           width: 1280,
           height: 720
         },
+
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36"
       });
     }
 
-    await page.goto("https://www.google.com/", {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    });
+    // IMPORTANT:
+    // Do NOT open Google here.
+    // /open will handle navigation.
 
     res.json({
       success: true,
@@ -108,13 +110,14 @@ app.get("/start", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       success: false,
       error: error.message
     });
+
   }
 });
-
 
 // SCREENSHOT
 app.get("/screenshot", checkToken, async (req, res) => {
@@ -135,14 +138,15 @@ app.get("/screenshot", checkToken, async (req, res) => {
     res.send(image);
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-
-// OPEN
+// OPEN URL
 app.post("/open", checkToken, async (req, res) => {
   try {
 
@@ -167,6 +171,16 @@ app.post("/open", checkToken, async (req, res) => {
     await page.goto(url, {
       waitUntil: "domcontentloaded",
       timeout: 60000
+    }).catch(async error => {
+
+      // If navigation is interrupted,
+      // don't immediately crash the session.
+      console.log("Navigation warning:", error.message);
+
+      if (page.url() === "about:blank") {
+        throw error;
+      }
+
     });
 
     res.json({
@@ -175,13 +189,14 @@ app.post("/open", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       success: false,
       error: error.message
     });
+
   }
 });
-
 
 // BACK
 app.post("/back", checkToken, async (req, res) => {
@@ -204,12 +219,13 @@ app.post("/back", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
-
 
 // FORWARD
 app.post("/forward", checkToken, async (req, res) => {
@@ -232,12 +248,13 @@ app.post("/forward", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
-
 
 // RELOAD
 app.post("/reload", checkToken, async (req, res) => {
@@ -260,13 +277,14 @@ app.post("/reload", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       success: false,
       error: error.message
     });
+
   }
 });
-
 
 // CLICK
 app.post("/click", checkToken, async (req, res) => {
@@ -294,12 +312,13 @@ app.post("/click", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
-
 
 // KEY
 app.post("/key", checkToken, async (req, res) => {
@@ -326,12 +345,13 @@ app.post("/key", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
-
 
 // TYPE
 app.post("/type", checkToken, async (req, res) => {
@@ -352,12 +372,13 @@ app.post("/type", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
-
 
 // SCROLL
 app.post("/scroll", checkToken, async (req, res) => {
@@ -378,12 +399,13 @@ app.post("/scroll", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
-
 
 // SERVER
 app.listen(PORT, "0.0.0.0", () => {
