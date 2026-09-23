@@ -1,21 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1.0"
+>
+
 <title>CP Remote Chrome</title>
 
 <style>
+
 *{
   box-sizing:border-box;
 }
 
+html,
 body{
   margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
   background:#111;
   color:#fff;
   font-family:Arial,sans-serif;
-  font-size:14px;
   overflow:hidden;
 }
 
@@ -60,8 +71,8 @@ button:focus{
 }
 
 #status{
-  height:24px;
-  padding:5px 7px;
+  height:28px;
+  padding:6px 7px;
   background:#181818;
   color:#aaa;
   font-size:10px;
@@ -71,24 +82,34 @@ button:focus{
 
 #screenBox{
   width:100%;
-  height:calc(100vh - 110px);
+  height:calc(100vh - 112px);
   background:#000;
+
   display:flex;
   justify-content:center;
   align-items:center;
+
   overflow:hidden;
 }
 
 #screen{
   max-width:100%;
   max-height:100%;
+
   width:auto;
   height:auto;
+
   display:block;
+
   background:#fff;
+
   user-select:none;
+
+  -webkit-user-drag:none;
 }
+
 </style>
+
 </head>
 
 <body>
@@ -104,7 +125,10 @@ button:focus{
 
 <div id="buttons">
 
-<button id="start" onclick="startBrowser()">
+<button
+  id="start"
+  onclick="startBrowser()"
+>
 START
 </button>
 
@@ -133,34 +157,40 @@ Remote Chromium offline
 </div>
 
 <div id="screenBox">
-<img id="screen" src="" alt="">
-</div>
 
+<img
+  id="screen"
+  src=""
+  alt=""
+>
+
+</div>
 
 <script>
 
 const SERVER =
-"https://cp-whatsapp-remote-chromium.onrender.com";
+  "https://cp-whatsapp-remote-chromium.onrender.com";
 
 const TOKEN =
-"cp-demo-2026";
+  "cp-demo-2026";
 
 const urlInput =
-document.getElementById("url");
+  document.getElementById("url");
 
 const screen =
-document.getElementById("screen");
+  document.getElementById("screen");
 
 const statusBox =
-document.getElementById("status");
+  document.getElementById("status");
 
 let running = false;
+
 let refreshTimer = null;
 
 
-// ========================================
-// START REMOTE CHROMIUM
-// ========================================
+// ================================
+// START
+// ================================
 
 async function startBrowser(){
 
@@ -184,7 +214,6 @@ async function startBrowser(){
       await response.text();
 
     if(!response.ok){
-
       throw new Error(text);
     }
 
@@ -197,6 +226,7 @@ async function startBrowser(){
         data.error ||
         "Browser start failed"
       );
+
     }
 
     running = true;
@@ -206,9 +236,12 @@ async function startBrowser(){
 
     startAutoRefresh();
 
-    await refreshScreen();
+    // Automatically open current URL
+    await openURL();
 
-  }catch(error){
+  }
+
+  catch(error){
 
     running = false;
 
@@ -221,9 +254,62 @@ async function startBrowser(){
 }
 
 
-// ========================================
-// OPEN WEBSITE
-// ========================================
+// ================================
+// API
+// ================================
+
+async function api(
+  path,
+  method="GET",
+  body=null
+){
+
+  const options = {
+
+    method:method,
+
+    headers:{
+      "X-Access-Token":TOKEN
+    },
+
+    cache:"no-store"
+
+  };
+
+  if(body !== null){
+
+    options.headers[
+      "Content-Type"
+    ] = "application/json";
+
+    options.body =
+      JSON.stringify(body);
+
+  }
+
+  const response =
+    await fetch(
+      SERVER + path,
+      options
+    );
+
+  if(!response.ok){
+
+    const text =
+      await response.text();
+
+    throw new Error(text);
+
+  }
+
+  return response;
+
+}
+
+
+// ================================
+// OPEN URL
+// ================================
 
 async function openURL(){
 
@@ -234,6 +320,9 @@ async function openURL(){
     if(!running){
       return;
     }
+
+    return;
+
   }
 
   let url =
@@ -243,6 +332,7 @@ async function openURL(){
 
     url =
       "https://www.google.com/";
+
   }
 
   if(
@@ -251,10 +341,10 @@ async function openURL(){
 
     url =
       "https://" + url;
+
   }
 
-  urlInput.value =
-    url;
+  urlInput.value = url;
 
   try{
 
@@ -279,14 +369,18 @@ async function openURL(){
         data.error ||
         "Open failed"
       );
+
     }
 
     statusBox.textContent =
-      "Remote: " + data.url;
+      "Remote: " +
+      data.url;
 
     await refreshScreen();
 
-  }catch(error){
+  }
+
+  catch(error){
 
     statusBox.textContent =
       "OPEN ERROR: " +
@@ -297,61 +391,9 @@ async function openURL(){
 }
 
 
-// ========================================
-// API HELPER
-// ========================================
-
-async function api(
-  path,
-  method="GET",
-  body=null
-){
-
-  const options = {
-
-    method:method,
-
-    headers:{
-      "X-Access-Token":TOKEN
-    },
-
-    cache:"no-store"
-
-  };
-
-  if(body !== null){
-
-    options.headers[
-      "Content-Type"
-    ] =
-      "application/json";
-
-    options.body =
-      JSON.stringify(body);
-  }
-
-  const response =
-    await fetch(
-      SERVER + path,
-      options
-    );
-
-  if(!response.ok){
-
-    const text =
-      await response.text();
-
-    throw new Error(text);
-  }
-
-  return response;
-
-}
-
-
-// ========================================
+// ================================
 // SCREENSHOT
-// ========================================
+// ================================
 
 async function refreshScreen(){
 
@@ -362,15 +404,14 @@ async function refreshScreen(){
   try{
 
     const response =
-      await api(
-        "/screenshot"
-      );
+      await api("/screenshot");
 
     if(!response.ok){
 
       throw new Error(
         "Screenshot failed"
       );
+
     }
 
     const blob =
@@ -379,19 +420,20 @@ async function refreshScreen(){
     const imageURL =
       URL.createObjectURL(blob);
 
-    screen.onload =
-      function(){
+    screen.onload = function(){
 
-        URL.revokeObjectURL(
-          imageURL
-        );
+      URL.revokeObjectURL(
+        imageURL
+      );
 
-      };
+    };
 
     screen.src =
       imageURL;
 
-  }catch(error){
+  }
+
+  catch(error){
 
     statusBox.textContent =
       "SCREEN ERROR: " +
@@ -402,9 +444,9 @@ async function refreshScreen(){
 }
 
 
-// ========================================
-// AUTO SCREEN REFRESH
-// ========================================
+// ================================
+// AUTO REFRESH
+// ================================
 
 function startAutoRefresh(){
 
@@ -421,9 +463,9 @@ function startAutoRefresh(){
 }
 
 
-// ========================================
+// ================================
 // BACK
-// ========================================
+// ================================
 
 async function goBack(){
 
@@ -433,29 +475,43 @@ async function goBack(){
 
   try{
 
-    await api(
-      "/back",
-      "POST"
-    );
+    statusBox.textContent =
+      "Going back...";
+
+    const response =
+      await api(
+        "/back",
+        "POST"
+      );
+
+    const data =
+      await response.json();
+
+    statusBox.textContent =
+      "Remote: " +
+      data.url;
 
     setTimeout(
       refreshScreen,
       300
     );
 
-  }catch(error){
+  }
+
+  catch(error){
 
     statusBox.textContent =
-      "BACK ERROR";
+      "BACK ERROR: " +
+      error.message;
 
   }
 
 }
 
 
-// ========================================
+// ================================
 // FORWARD
-// ========================================
+// ================================
 
 async function goForward(){
 
@@ -465,29 +521,43 @@ async function goForward(){
 
   try{
 
-    await api(
-      "/forward",
-      "POST"
-    );
+    statusBox.textContent =
+      "Going forward...";
+
+    const response =
+      await api(
+        "/forward",
+        "POST"
+      );
+
+    const data =
+      await response.json();
+
+    statusBox.textContent =
+      "Remote: " +
+      data.url;
 
     setTimeout(
       refreshScreen,
       300
     );
 
-  }catch(error){
+  }
+
+  catch(error){
 
     statusBox.textContent =
-      "NEXT ERROR";
+      "NEXT ERROR: " +
+      error.message;
 
   }
 
 }
 
 
-// ========================================
+// ================================
 // RELOAD
-// ========================================
+// ================================
 
 async function reloadPage(){
 
@@ -500,29 +570,40 @@ async function reloadPage(){
     statusBox.textContent =
       "Reloading...";
 
-    await api(
-      "/reload",
-      "POST"
-    );
+    const response =
+      await api(
+        "/reload",
+        "POST"
+      );
+
+    const data =
+      await response.json();
+
+    statusBox.textContent =
+      "Remote: " +
+      data.url;
 
     setTimeout(
       refreshScreen,
       500
     );
 
-  }catch(error){
+  }
+
+  catch(error){
 
     statusBox.textContent =
-      "RELOAD ERROR";
+      "RELOAD ERROR: " +
+      error.message;
 
   }
 
 }
 
 
-// ========================================
-// REMOTE MOUSE CLICK
-// ========================================
+// ================================
+// SCREEN CLICK
+// ================================
 
 screen.addEventListener(
   "click",
@@ -545,15 +626,16 @@ screen.addEventListener(
       rect.width <= 0 ||
       rect.height <= 0
     ){
+
       return;
+
     }
 
     const x =
       (
         event.clientX -
         rect.left
-      )
-      *
+      ) *
       width /
       rect.width;
 
@@ -561,8 +643,7 @@ screen.addEventListener(
       (
         event.clientY -
         rect.top
-      )
-      *
+      ) *
       height /
       rect.height;
 
@@ -582,10 +663,13 @@ screen.addEventListener(
         250
       );
 
-    }catch(error){
+    }
+
+    catch(error){
 
       statusBox.textContent =
-        "CLICK ERROR";
+        "CLICK ERROR: " +
+        error.message;
 
     }
 
@@ -593,9 +677,9 @@ screen.addEventListener(
 );
 
 
-// ========================================
-// KEYBOARD CONTROL
-// ========================================
+// ================================
+// KEYBOARD
+// ================================
 
 document.addEventListener(
   "keydown",
@@ -606,9 +690,7 @@ document.addEventListener(
       urlInput
     ){
 
-      if(
-        event.key === "Enter"
-      ){
+      if(event.key === "Enter"){
 
         event.preventDefault();
 
@@ -617,13 +699,14 @@ document.addEventListener(
       }
 
       return;
+
     }
 
     if(!running){
       return;
     }
 
-    let key =
+    const key =
       event.key;
 
     try{
@@ -641,10 +724,13 @@ document.addEventListener(
         200
       );
 
-    }catch(error){
+    }
+
+    catch(error){
 
       statusBox.textContent =
-        "KEY ERROR";
+        "KEY ERROR: " +
+        error.message;
 
     }
 
@@ -652,17 +738,15 @@ document.addEventListener(
 );
 
 
-// ========================================
+// ================================
 // URL ENTER
-// ========================================
+// ================================
 
 urlInput.addEventListener(
   "keydown",
   function(event){
 
-    if(
-      event.key === "Enter"
-    ){
+    if(event.key === "Enter"){
 
       event.preventDefault();
 
@@ -674,9 +758,9 @@ urlInput.addEventListener(
 );
 
 
-// ========================================
-// KEYPAD SHORTCUTS
-// ========================================
+// ================================
+// NUMBER SHORTCUTS
+// ================================
 
 document.addEventListener(
   "keydown",
@@ -686,7 +770,9 @@ document.addEventListener(
       document.activeElement ===
       urlInput
     ){
+
       return;
+
     }
 
     if(event.key === "1"){
@@ -731,4 +817,5 @@ document.addEventListener(
 </script>
 
 </body>
+
 </html>
