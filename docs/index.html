@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CP Remote Chrome</title>
+
+<style>
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  background:#111;
+  color:#fff;
+  font-family:Arial,sans-serif;
+  font-size:16px;
+}
+
+#top{
+  background:#202124;
+  padding:8px;
+  border-bottom:1px solid #555;
+}
+
+#url{
+  width:100%;
+  height:38px;
+  background:#303134;
+  color:#fff;
+  border:1px solid #777;
+  border-radius:5px;
+  padding:5px 8px;
+  font-size:14px;
+}
+
+#buttons{
+  display:flex;
+  gap:5px;
+  margin-top:6px;
+}
+
+button{
+  background:#303134;
+  color:#fff;
+  border:1px solid #777;
+  padding:7px 10px;
+  border-radius:4px;
+  font-size:13px;
+}
+
+button:focus,
+input:focus{
+  outline:2px solid #8ab4f8;
+}
+
+#status{
+  padding:5px 8px;
+  background:#181818;
+  color:#aaa;
+  font-size:11px;
+}
+
+#screen{
+  width:100%;
+  height:calc(100vh - 105px);
+  border:0;
+  background:#fff;
+}
+</style>
+</head>
+
+<body>
+
+<div id="top">
+
+<input
+ id="url"
+ type="text"
+ value="https://web.whatsapp.com/"
+ placeholder="Enter website URL"
+>
+
+<div id="buttons">
+<button onclick="go()">GO</button>
+<button onclick="back()">BACK</button>
+<button onclick="forward()">NEXT</button>
+<button onclick="reload()">RELOAD</button>
+</div>
+
+</div>
+
+<div id="status">
+CP Remote Chrome
+</div>
+
+<iframe
+ id="screen"
+ src="about:blank"
+ allow="fullscreen; clipboard-read; clipboard-write"
+></iframe>
+
+<script>
+
+const input = document.getElementById("url");
+const frame = document.getElementById("screen");
+const statusBox = document.getElementById("status");
+
+function cleanUrl(value){
+
+  value = value.trim();
+
+  if(!value){
+    return "https://www.google.com/";
+  }
+
+  if(!/^https?:\/\//i.test(value)){
+    value = "https://" + value;
+  }
+
+  return value;
+}
+
+function go(){
+
+  const url = cleanUrl(input.value);
+
+  input.value = url;
+
+  frame.src = url;
+
+  statusBox.textContent = "Opening: " + url;
+}
+
+function back(){
+
+  try{
+    frame.contentWindow.history.back();
+  }catch(e){}
+
+}
+
+function forward(){
+
+  try{
+    frame.contentWindow.history.forward();
+  }catch(e){}
+
+}
+
+function reload(){
+
+  try{
+    frame.contentWindow.location.reload();
+  }catch(e){
+
+    frame.src = frame.src;
+
+  }
+
+}
+
+input.addEventListener("keydown",function(e){
+
+  if(e.key === "Enter"){
+    go();
+  }
+
+});
+
+document.addEventListener("keydown",function(e){
+
+  if(e.key === "Enter"){
+    if(document.activeElement !== input){
+      go();
+    }
+  }
+
+  if(e.key === "1"){
+    input.value="https://web.whatsapp.com/";
+    go();
+  }
+
+  if(e.key === "2"){
+    reload();
+  }
+
+  if(e.key === "3"){
+    input.value="https://www.google.com/";
+    go();
+  }
+
+  if(e.key === "4"){
+    input.value="https://www.youtube.com/";
+    go();
+  }
+
+  if(e.key === "5"){
+    input.value="https://www.facebook.com/";
+    go();
+  }
+
+});
+
+</script>
+
+</body>
+</html>
