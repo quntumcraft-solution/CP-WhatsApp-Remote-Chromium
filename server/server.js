@@ -11,7 +11,10 @@ app.use(express.json({ limit: "1mb" }));
 // CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Content-Type, X-Access-Token");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-Access-Token"
+  );
   res.header(
     "Access-Control-Allow-Methods",
     "GET, POST, OPTIONS"
@@ -28,7 +31,9 @@ let browser = null;
 let page = null;
 
 function checkToken(req, res, next) {
-  const token = req.headers["x-access-token"];
+  const token =
+    req.headers["x-access-token"] ||
+    req.query.token;
 
   if (token !== ACCESS_TOKEN) {
     return res.status(401).json({
@@ -39,7 +44,11 @@ function checkToken(req, res, next) {
   next();
 }
 
-// Server status
+
+// ===============================
+// SERVER STATUS
+// ===============================
+
 app.get("/", (req, res) => {
   res.json({
     name: "CP Remote Chromium",
@@ -47,64 +56,25 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health
+
+// ===============================
+// HEALTH
+// ===============================
+
 app.get("/health", (req, res) => {
   res.json({
     status: "ok"
   });
 });
 
-// Start Chromium
-app.get("/start", async (req, res) => {
+
+// ===============================
+// START - GET
+// ===============================
+
+app.get("/start", checkToken, async (req, res) => {
   try {
-    const token = req.query.token;
 
-    if (token !== ACCESS_TOKEN) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    if (!browser) {
-      browser = await chromium.launch({
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu"
-        ]
-      });
-    }
-
-    if (!page) {
-      page = await browser.newPage({
-        viewport: {
-          width: 1280,
-          height: 720
-        },
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36"
-      });
-    }
-
-    await page.goto("https://www.google.com/", {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    });
-
-    res.json({
-      success: true,
-      url: page.url()
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
     if (!browser) {
       browser = await chromium.launch({
         headless: true,
@@ -129,10 +99,13 @@ app.get("/start", async (req, res) => {
       });
     }
 
-    await page.goto("https://www.google.com/", {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    });
+    await page.goto(
+      "https://www.google.com/",
+      {
+        waitUntil: "domcontentloaded",
+        timeout: 60000
+      }
+    );
 
     res.json({
       success: true,
@@ -140,40 +113,110 @@ app.get("/start", async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       success: false,
       error: error.message
     });
+
   }
 });
 
-// Screenshot
+
+// ===============================
+// START - POST
+// ===============================
+
+app.post("/start", checkToken, async (req, res) => {
+  try {
+
+    if (!browser) {
+      browser = await chromium.launch({
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu"
+        ]
+      });
+    }
+
+    if (!page) {
+      page = await browser.newPage({
+        viewport: {
+          width: 1280,
+          height: 720
+        },
+
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36"
+      });
+    }
+
+    await page.goto(
+      "https://www.google.com/",
+      {
+        waitUntil: "domcontentloaded",
+        timeout: 60000
+      }
+    );
+
+    res.json({
+      success: true,
+      url: page.url()
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+
+  }
+});
+
+
+// ===============================
+// SCREENSHOT
+// ===============================
+
 app.get("/screenshot", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
       });
     }
 
-    const image = await page.screenshot({
-      type: "jpeg",
-      quality: 65
-    });
+    const image =
+      await page.screenshot({
+        type: "jpeg",
+        quality: 65
+      });
 
     res.set("Content-Type", "image/jpeg");
     res.send(image);
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-// Open URL
+
+// ===============================
+// OPEN URL
+// ===============================
+
 app.post("/open", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
@@ -192,10 +235,13 @@ app.post("/open", checkToken, async (req, res) => {
       url = "https://" + url;
     }
 
-    await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    });
+    await page.goto(
+      url,
+      {
+        waitUntil: "domcontentloaded",
+        timeout: 60000
+      }
+    );
 
     res.json({
       success: true,
@@ -203,16 +249,23 @@ app.post("/open", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       success: false,
       error: error.message
     });
+
   }
 });
 
-// Back
+
+// ===============================
+// BACK
+// ===============================
+
 app.post("/back", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
@@ -230,15 +283,22 @@ app.post("/back", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-// Forward
+
+// ===============================
+// FORWARD
+// ===============================
+
 app.post("/forward", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
@@ -256,15 +316,23 @@ app.post("/forward", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
+      success: false,
       error: error.message
     });
+
   }
 });
 
-// Reload
+
+// ===============================
+// RELOAD
+// ===============================
+
 app.post("/reload", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
@@ -282,15 +350,23 @@ app.post("/reload", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
+      success: false,
       error: error.message
     });
+
   }
 });
 
-// Mouse click
+
+// ===============================
+// CLICK
+// ===============================
+
 app.post("/click", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
@@ -313,15 +389,22 @@ app.post("/click", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-// Keyboard
+
+// ===============================
+// KEY
+// ===============================
+
 app.post("/key", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
@@ -343,22 +426,31 @@ app.post("/key", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-// Text input
+
+// ===============================
+// TYPE
+// ===============================
+
 app.post("/type", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
       });
     }
 
-    const text = String(req.body.text || "");
+    const text = String(
+      req.body.text || ""
+    );
 
     await page.keyboard.type(text);
 
@@ -367,38 +459,60 @@ app.post("/type", checkToken, async (req, res) => {
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-// Scroll
+
+// ===============================
+// SCROLL
+// ===============================
+
 app.post("/scroll", checkToken, async (req, res) => {
   try {
+
     if (!page) {
       return res.status(400).json({
         error: "Browser not started"
       });
     }
 
-    const amount = Number(req.body.amount || 500);
+    const amount =
+      Number(req.body.amount || 500);
 
-    await page.mouse.wheel(0, amount);
+    await page.mouse.wheel(
+      0,
+      amount
+    );
 
     res.json({
       success: true
     });
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `CP Remote Chromium running on port ${PORT}`
-  );
-});
+
+// ===============================
+// START SERVER
+// ===============================
+
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `CP Remote Chromium running on port ${PORT}`
+    );
+  }
+);
