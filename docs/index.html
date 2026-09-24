@@ -10,7 +10,7 @@
   content="width=device-width,initial-scale=1.0"
 >
 
-<title>CP Remote Chrome</title>
+<title>CP Powerful Browser</title>
 
 <style>
 
@@ -32,24 +32,24 @@ body{
 
 #top{
   background:#202124;
-  padding:6px;
+  padding:4px;
 }
 
 #url{
   width:100%;
-  height:34px;
+  height:30px;
   background:#303134;
   color:#fff;
   border:1px solid #777;
   border-radius:4px;
-  padding:5px 8px;
-  font-size:13px;
+  padding:4px 6px;
+  font-size:12px;
 }
 
 #buttons{
   display:flex;
-  gap:4px;
-  margin-top:5px;
+  gap:3px;
+  margin-top:4px;
   flex-wrap:wrap;
 }
 
@@ -57,9 +57,9 @@ button{
   background:#303134;
   color:#fff;
   border:1px solid #777;
-  border-radius:4px;
-  padding:6px 9px;
-  font-size:12px;
+  border-radius:3px;
+  padding:5px 7px;
+  font-size:11px;
 }
 
 button:focus{
@@ -71,41 +71,60 @@ button:focus{
 }
 
 #status{
-  height:28px;
-  padding:6px 7px;
+  height:25px;
+  padding:5px;
   background:#181818;
   color:#aaa;
-  font-size:10px;
-  overflow:hidden;
+  font-size:9px;
   white-space:nowrap;
+  overflow:hidden;
 }
 
 #screenBox{
   width:100%;
-  height:calc(100vh - 112px);
+  height:calc(100vh - 98px);
   background:#000;
-
   display:flex;
   justify-content:center;
   align-items:center;
-
   overflow:hidden;
 }
 
 #screen{
   max-width:100%;
   max-height:100%;
-
   width:auto;
   height:auto;
-
   display:block;
-
   background:#fff;
-
   user-select:none;
-
   -webkit-user-drag:none;
+}
+
+#menu{
+  position:absolute;
+  left:4px;
+  right:4px;
+  bottom:4px;
+  background:#202124;
+  border:1px solid #777;
+  padding:5px;
+  display:none;
+  z-index:20;
+}
+
+.menuItem{
+  padding:6px;
+  border-bottom:1px solid #444;
+  font-size:11px;
+}
+
+.menuItem:last-child{
+  border-bottom:none;
+}
+
+.menuSelected{
+  background:#1a73e8;
 }
 
 </style>
@@ -120,32 +139,37 @@ button:focus{
   id="url"
   type="text"
   value="https://www.google.com/"
-  placeholder="Enter website URL"
+  placeholder="URL / Search"
 >
 
 <div id="buttons">
 
-<button
-  id="start"
-  onclick="startBrowser()"
->
+<button id="start">
 START
 </button>
 
-<button onclick="openURL()">
+<button id="go">
 GO
 </button>
 
-<button onclick="goBack()">
+<button id="back">
 BACK
 </button>
 
-<button onclick="goForward()">
+<button id="forward">
 NEXT
 </button>
 
-<button onclick="reloadPage()">
+<button id="reload">
 RELOAD
+</button>
+
+<button id="zoomIn">
+ZOOM+
+</button>
+
+<button id="zoomOut">
+ZOOM-
 </button>
 
 </div>
@@ -166,6 +190,45 @@ Remote Chromium offline
 
 </div>
 
+<div id="menu">
+
+<div
+  class="menuItem"
+  data-action="google"
+>
+1. Google
+</div>
+
+<div
+  class="menuItem"
+  data-action="youtube"
+>
+2. YouTube
+</div>
+
+<div
+  class="menuItem"
+  data-action="whatsapp"
+>
+3. WhatsApp
+</div>
+
+<div
+  class="menuItem"
+  data-action="zoomreset"
+>
+4. Reset Zoom
+</div>
+
+<div
+  class="menuItem"
+  data-action="close"
+>
+5. Close Menu
+</div>
+
+</div>
+
 <script>
 
 const SERVER =
@@ -183,80 +246,24 @@ const screen =
 const statusBox =
   document.getElementById("status");
 
+const menu =
+  document.getElementById("menu");
+
+const menuItems =
+  document.querySelectorAll(".menuItem");
+
 let running = false;
 
 let refreshTimer = null;
 
+let menuOpen = false;
 
-// ================================
-// START
-// ================================
-
-async function startBrowser(){
-
-  try{
-
-    statusBox.textContent =
-      "Starting Remote Chromium...";
-
-    const response =
-      await fetch(
-        SERVER +
-        "/start?token=" +
-        encodeURIComponent(TOKEN),
-        {
-          method:"GET",
-          cache:"no-store"
-        }
-      );
-
-    const text =
-      await response.text();
-
-    if(!response.ok){
-      throw new Error(text);
-    }
-
-    const data =
-      JSON.parse(text);
-
-    if(data.success !== true){
-
-      throw new Error(
-        data.error ||
-        "Browser start failed"
-      );
-
-    }
-
-    running = true;
-
-    statusBox.textContent =
-      "Remote Chromium: ONLINE";
-
-    startAutoRefresh();
-
-    // Automatically open current URL
-    await openURL();
-
-  }
-
-  catch(error){
-
-    running = false;
-
-    statusBox.textContent =
-      "START ERROR: " +
-      error.message;
-
-  }
-
-}
+let menuIndex = 0;
 
 
-// ================================
+// =================================
 // API
-// ================================
+// =================================
 
 async function api(
   path,
@@ -307,19 +314,84 @@ async function api(
 }
 
 
-// ================================
-// OPEN URL
-// ================================
+// =================================
+// START
+// =================================
+
+async function startBrowser(){
+
+  if(running){
+    return;
+  }
+
+  try{
+
+    statusBox.textContent =
+      "Starting Chromium...";
+
+    const response =
+      await fetch(
+        SERVER +
+        "/start?token=" +
+        encodeURIComponent(TOKEN),
+        {
+          method:"GET",
+          cache:"no-store"
+        }
+      );
+
+    const text =
+      await response.text();
+
+    if(!response.ok){
+      throw new Error(text);
+    }
+
+    const data =
+      JSON.parse(text);
+
+    if(data.success !== true){
+
+      throw new Error(
+        data.error ||
+        "Browser start failed"
+      );
+
+    }
+
+    running = true;
+
+    statusBox.textContent =
+      "Chromium ONLINE";
+
+    startAutoRefresh();
+
+    await openURL();
+
+  }
+
+  catch(error){
+
+    running = false;
+
+    statusBox.textContent =
+      "START ERROR: " +
+      error.message;
+
+  }
+
+}
+
+
+// =================================
+// OPEN
+// =================================
 
 async function openURL(){
 
   if(!running){
 
     await startBrowser();
-
-    if(!running){
-      return;
-    }
 
     return;
 
@@ -363,15 +435,6 @@ async function openURL(){
     const data =
       await response.json();
 
-    if(!response.ok){
-
-      throw new Error(
-        data.error ||
-        "Open failed"
-      );
-
-    }
-
     statusBox.textContent =
       "Remote: " +
       data.url;
@@ -391,9 +454,9 @@ async function openURL(){
 }
 
 
-// ================================
+// =================================
 // SCREENSHOT
-// ================================
+// =================================
 
 async function refreshScreen(){
 
@@ -406,27 +469,20 @@ async function refreshScreen(){
     const response =
       await api("/screenshot");
 
-    if(!response.ok){
-
-      throw new Error(
-        "Screenshot failed"
-      );
-
-    }
-
     const blob =
       await response.blob();
 
     const imageURL =
       URL.createObjectURL(blob);
 
-    screen.onload = function(){
+    screen.onload =
+      function(){
 
-      URL.revokeObjectURL(
-        imageURL
-      );
+        URL.revokeObjectURL(
+          imageURL
+        );
 
-    };
+      };
 
     screen.src =
       imageURL;
@@ -436,17 +492,16 @@ async function refreshScreen(){
   catch(error){
 
     statusBox.textContent =
-      "SCREEN ERROR: " +
-      error.message;
+      "SCREEN ERROR";
 
   }
 
 }
 
 
-// ================================
+// =================================
 // AUTO REFRESH
-// ================================
+// =================================
 
 function startAutoRefresh(){
 
@@ -463,9 +518,9 @@ function startAutoRefresh(){
 }
 
 
-// ================================
+// =================================
 // BACK
-// ================================
+// =================================
 
 async function goBack(){
 
@@ -474,9 +529,6 @@ async function goBack(){
   }
 
   try{
-
-    statusBox.textContent =
-      "Going back...";
 
     const response =
       await api(
@@ -501,17 +553,16 @@ async function goBack(){
   catch(error){
 
     statusBox.textContent =
-      "BACK ERROR: " +
-      error.message;
+      "BACK ERROR";
 
   }
 
 }
 
 
-// ================================
+// =================================
 // FORWARD
-// ================================
+// =================================
 
 async function goForward(){
 
@@ -520,9 +571,6 @@ async function goForward(){
   }
 
   try{
-
-    statusBox.textContent =
-      "Going forward...";
 
     const response =
       await api(
@@ -547,17 +595,16 @@ async function goForward(){
   catch(error){
 
     statusBox.textContent =
-      "NEXT ERROR: " +
-      error.message;
+      "NEXT ERROR";
 
   }
 
 }
 
 
-// ================================
+// =================================
 // RELOAD
-// ================================
+// =================================
 
 async function reloadPage(){
 
@@ -570,18 +617,10 @@ async function reloadPage(){
     statusBox.textContent =
       "Reloading...";
 
-    const response =
-      await api(
-        "/reload",
-        "POST"
-      );
-
-    const data =
-      await response.json();
-
-    statusBox.textContent =
-      "Remote: " +
-      data.url;
+    await api(
+      "/reload",
+      "POST"
+    );
 
     setTimeout(
       refreshScreen,
@@ -593,17 +632,124 @@ async function reloadPage(){
   catch(error){
 
     statusBox.textContent =
-      "RELOAD ERROR: " +
-      error.message;
+      "RELOAD ERROR";
 
   }
 
 }
 
 
-// ================================
-// SCREEN CLICK
-// ================================
+// =================================
+// ZOOM IN
+// =================================
+
+async function zoomIn(){
+
+  if(!running){
+    return;
+  }
+
+  try{
+
+    await api(
+      "/zoom",
+      "POST",
+      {
+        amount:0.15
+      }
+    );
+
+    setTimeout(
+      refreshScreen,
+      300
+    );
+
+  }
+
+  catch(error){
+
+    statusBox.textContent =
+      "ZOOM ERROR";
+
+  }
+
+}
+
+
+// =================================
+// ZOOM OUT
+// =================================
+
+async function zoomOut(){
+
+  if(!running){
+    return;
+  }
+
+  try{
+
+    await api(
+      "/zoom",
+      "POST",
+      {
+        amount:-0.15
+      }
+    );
+
+    setTimeout(
+      refreshScreen,
+      300
+    );
+
+  }
+
+  catch(error){
+
+    statusBox.textContent =
+      "ZOOM ERROR";
+
+  }
+
+}
+
+
+// =================================
+// RESET ZOOM
+// =================================
+
+async function resetZoom(){
+
+  if(!running){
+    return;
+  }
+
+  try{
+
+    await api(
+      "/zoom/reset",
+      "POST"
+    );
+
+    setTimeout(
+      refreshScreen,
+      300
+    );
+
+  }
+
+  catch(error){
+
+    statusBox.textContent =
+      "ZOOM ERROR";
+
+  }
+
+}
+
+
+// =================================
+// CLICK SCREEN
+// =================================
 
 screen.addEventListener(
   "click",
@@ -626,9 +772,7 @@ screen.addEventListener(
       rect.width <= 0 ||
       rect.height <= 0
     ){
-
       return;
-
     }
 
     const x =
@@ -668,8 +812,7 @@ screen.addEventListener(
     catch(error){
 
       statusBox.textContent =
-        "CLICK ERROR: " +
-        error.message;
+        "CLICK ERROR";
 
     }
 
@@ -677,14 +820,15 @@ screen.addEventListener(
 );
 
 
-// ================================
+// =================================
 // KEYBOARD
-// ================================
+// =================================
 
 document.addEventListener(
   "keydown",
   async function(event){
 
+    // URL field
     if(
       document.activeElement ===
       urlInput
@@ -694,7 +838,7 @@ document.addEventListener(
 
         event.preventDefault();
 
-        openURL();
+        await openURL();
 
       }
 
@@ -702,20 +846,212 @@ document.addEventListener(
 
     }
 
+    // MENU
+    if(menuOpen){
+
+      if(event.key === "ArrowDown"){
+
+        event.preventDefault();
+
+        menuIndex++;
+
+        if(
+          menuIndex >=
+          menuItems.length
+        ){
+
+          menuIndex = 0;
+
+        }
+
+        updateMenu();
+
+        return;
+
+      }
+
+      if(event.key === "ArrowUp"){
+
+        event.preventDefault();
+
+        menuIndex--;
+
+        if(menuIndex < 0){
+
+          menuIndex =
+            menuItems.length - 1;
+
+        }
+
+        updateMenu();
+
+        return;
+
+      }
+
+      if(event.key === "Enter"){
+
+        event.preventDefault();
+
+        selectMenu();
+
+        return;
+
+      }
+
+      if(
+        event.key === "Escape" ||
+        event.key === "#"
+      ){
+
+        event.preventDefault();
+
+        closeMenu();
+
+        return;
+
+      }
+
+    }
+
     if(!running){
       return;
     }
 
-    const key =
-      event.key;
+    // MENU
+    if(
+      event.key === "*" ||
+      event.key === "m" ||
+      event.key === "M"
+    ){
 
+      event.preventDefault();
+
+      toggleMenu();
+
+      return;
+
+    }
+
+    // Zoom +
+    if(
+      event.key === "+"
+    ){
+
+      event.preventDefault();
+
+      await zoomIn();
+
+      return;
+
+    }
+
+    // Zoom -
+    if(
+      event.key === "-"
+    ){
+
+      event.preventDefault();
+
+      await zoomOut();
+
+      return;
+
+    }
+
+    // Scroll up
+    if(
+      event.key === "ArrowUp"
+    ){
+
+      event.preventDefault();
+
+      await api(
+        "/scroll",
+        "POST",
+        {
+          amount:-450
+        }
+      );
+
+      setTimeout(
+        refreshScreen,
+        200
+      );
+
+      return;
+
+    }
+
+    // Scroll down
+    if(
+      event.key === "ArrowDown"
+    ){
+
+      event.preventDefault();
+
+      await api(
+        "/scroll",
+        "POST",
+        {
+          amount:450
+        }
+      );
+
+      setTimeout(
+        refreshScreen,
+        200
+      );
+
+      return;
+
+    }
+
+    // Left
+    if(
+      event.key === "ArrowLeft"
+    ){
+
+      event.preventDefault();
+
+      await goBack();
+
+      return;
+
+    }
+
+    // Right
+    if(
+      event.key === "ArrowRight"
+    ){
+
+      event.preventDefault();
+
+      await goForward();
+
+      return;
+
+    }
+
+    // RSK style Escape
+    if(
+      event.key === "Escape"
+    ){
+
+      event.preventDefault();
+
+      return;
+
+    }
+
+    // Other keys
     try{
 
       await api(
         "/key",
         "POST",
         {
-          key:key
+          key:event.key
         }
       );
 
@@ -729,8 +1065,7 @@ document.addEventListener(
     catch(error){
 
       statusBox.textContent =
-        "KEY ERROR: " +
-        error.message;
+        "KEY ERROR";
 
     }
 
@@ -738,78 +1073,167 @@ document.addEventListener(
 );
 
 
-// ================================
-// URL ENTER
-// ================================
+// =================================
+// MENU
+// =================================
 
-urlInput.addEventListener(
-  "keydown",
-  function(event){
+function toggleMenu(){
 
-    if(event.key === "Enter"){
+  menuOpen =
+    !menuOpen;
 
-      event.preventDefault();
+  menu.style.display =
+    menuOpen
+      ? "block"
+      : "none";
 
-      openURL();
+  menuIndex = 0;
+
+  updateMenu();
+
+}
+
+
+function closeMenu(){
+
+  menuOpen = false;
+
+  menu.style.display =
+    "none";
+
+}
+
+
+function updateMenu(){
+
+  menuItems.forEach(
+    (item,index) => {
+
+      item.classList.toggle(
+        "menuSelected",
+        index === menuIndex
+      );
 
     }
+  );
+
+}
+
+
+async function selectMenu(){
+
+  const action =
+    menuItems[
+      menuIndex
+    ].dataset.action;
+
+  if(action === "google"){
+
+    urlInput.value =
+      "https://www.google.com/";
+
+    closeMenu();
+
+    await openURL();
 
   }
-);
+
+  else if(action === "youtube"){
+
+    urlInput.value =
+      "https://www.youtube.com/";
+
+    closeMenu();
+
+    await openURL();
+
+  }
+
+  else if(action === "whatsapp"){
+
+    urlInput.value =
+      "https://web.whatsapp.com/";
+
+    closeMenu();
+
+    await openURL();
+
+  }
+
+  else if(action === "zoomreset"){
+
+    closeMenu();
+
+    await resetZoom();
+
+  }
+
+  else if(action === "close"){
+
+    closeMenu();
+
+  }
+
+}
 
 
-// ================================
-// NUMBER SHORTCUTS
-// ================================
+// =================================
+// BUTTONS
+// =================================
 
-document.addEventListener(
-  "keydown",
-  function(event){
+document
+  .getElementById("start")
+  .onclick =
+  startBrowser;
 
-    if(
-      document.activeElement ===
-      urlInput
-    ){
+document
+  .getElementById("go")
+  .onclick =
+  openURL;
 
-      return;
+document
+  .getElementById("back")
+  .onclick =
+  goBack;
 
-    }
+document
+  .getElementById("forward")
+  .onclick =
+  goForward;
 
-    if(event.key === "1"){
+document
+  .getElementById("reload")
+  .onclick =
+  reloadPage;
 
-      urlInput.value =
-        "https://www.google.com/";
+document
+  .getElementById("zoomIn")
+  .onclick =
+  zoomIn;
 
-      openURL();
+document
+  .getElementById("zoomOut")
+  .onclick =
+  zoomOut;
 
-    }
 
-    else if(event.key === "2"){
+// =================================
+// MENU CLICK
+// =================================
 
-      urlInput.value =
-        "https://www.youtube.com/";
+menuItems.forEach(
+  (item,index) => {
 
-      openURL();
+    item.addEventListener(
+      "click",
+      async function(){
 
-    }
+        menuIndex = index;
 
-    else if(event.key === "3"){
+        await selectMenu();
 
-      urlInput.value =
-        "https://web.whatsapp.com/";
-
-      openURL();
-
-    }
-
-    else if(event.key === "4"){
-
-      urlInput.value =
-        "https://www.facebook.com/";
-
-      openURL();
-
-    }
+      }
+    );
 
   }
 );
