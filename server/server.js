@@ -6,9 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "cp-demo-2026";
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "2mb" }));
 
-// CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -27,11 +26,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Browser state
 let browser = null;
+let context = null;
 let page = null;
 
-// Token check
 function checkToken(req, res, next) {
   const token =
     req.headers["x-access-token"] ||
@@ -46,10 +44,54 @@ function checkToken(req, res, next) {
   next();
 }
 
+async function ensureBrowser() {
+  if (!browser) {
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-software-rasterizer"
+      ]
+    });
+  }
+
+  if (!context) {
+    context = await browser.newContext({
+      viewport: {
+        width: 1280,
+        height: 720
+      },
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+      acceptDownloads: true
+    });
+  }
+
+  if (!page || page.isClosed()) {
+    page = await context.newPage();
+
+    page.on("download", download => {
+      console.log(
+        "Download started:",
+        download.suggestedFilename()
+      );
+    });
+
+    page.on("console", msg => {
+      console.log("PAGE:", msg.text());
+    });
+  }
+
+  return page;
+}
+
 // HOME
 app.get("/", (req, res) => {
   res.json({
-    name: "CP Remote Chromium",
+    name: "CP Powerful Remote Chromium",
     status: "online"
   });
 });
@@ -65,65 +107,43 @@ app.get("/health", (req, res) => {
 app.get("/test", (req, res) => {
   res.json({
     test: "SUCCESS",
-    message: "New server.js is running"
+    message: "Powerful browser server is running"
   });
 });
 
-// START BROWSER
+// START
 app.get("/start", checkToken, async (req, res) => {
   try {
-
-    // Launch Chromium
-    if (!browser) {
-      browser = await chromium.launch({
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--disable-software-rasterizer"
-        ]
-      });
-    }
-
-    // Create page
-    if (!page) {
-      page = await browser.newPage({
-        viewport: {
-          width: 1280,
-          height: 720
-        },
-
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36"
-      });
-    }
-
-    // IMPORTANT:
-    // Do NOT open Google here.
-    // /open will handle navigation.
+    const currentPage = await ensureBrowser();
 
     res.json({
       success: true,
-      url: page.url()
+      url: currentPage.url()
     });
 
   } catch (error) {
-
     res.status(500).json({
       success: false,
       error: error.message
     });
-
   }
+});
+
+// STATUS
+app.get("/status", checkToken, async (req, res) => {
+  res.json({
+    browser: !!browser,
+    page: !!page && !page.isClosed(),
+    url: page && !page.isClosed()
+      ? page.url()
+      : null
+  });
 });
 
 // SCREENSHOT
 app.get("/screenshot", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
@@ -131,32 +151,25 @@ app.get("/screenshot", checkToken, async (req, res) => {
 
     const image = await page.screenshot({
       type: "jpeg",
-      quality: 65
+      quality: 60
     });
 
     res.type("image/jpeg");
     res.send(image);
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 });
 
-// OPEN URL
+// OPEN
 app.post("/open", checkToken, async (req, res) => {
   try {
+    const currentPage = await ensureBrowser();
 
-    if (!page) {
-      return res.status(400).json({
-        error: "Browser not started"
-      });
-    }
-
-    let url = req.body.url;
+    let url = String(req.body.url || "").trim();
 
     if (!url) {
       return res.status(400).json({
@@ -168,41 +181,41 @@ app.post("/open", checkToken, async (req, res) => {
       url = "https://" + url;
     }
 
-    await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    }).catch(async error => {
+    try {
+      await currentPage.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000
+      });
+    } catch (error) {
+      console.log(
+        "Navigation warning:",
+        error.message
+      );
 
-      // If navigation is interrupted,
-      // don't immediately crash the session.
-      console.log("Navigation warning:", error.message);
-
-      if (page.url() === "about:blank") {
+      // Some websites continue loading after
+      // domcontentloaded/navigation events.
+      if (currentPage.url() === "about:blank") {
         throw error;
       }
-
-    });
+    }
 
     res.json({
       success: true,
-      url: page.url()
+      url: currentPage.url()
     });
 
   } catch (error) {
-
     res.status(500).json({
       success: false,
       error: error.message
     });
-
   }
 });
 
 // BACK
 app.post("/back", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
@@ -219,19 +232,16 @@ app.post("/back", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 });
 
 // FORWARD
 app.post("/forward", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
@@ -248,19 +258,16 @@ app.post("/forward", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 });
 
 // RELOAD
 app.post("/reload", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
@@ -277,20 +284,17 @@ app.post("/reload", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       success: false,
       error: error.message
     });
-
   }
 });
 
 // CLICK
 app.post("/click", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
@@ -312,25 +316,22 @@ app.post("/click", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 });
 
 // KEY
 app.post("/key", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
     }
 
-    const key = req.body.key;
+    const key = String(req.body.key || "");
 
     if (!key) {
       return res.status(400).json({
@@ -345,19 +346,16 @@ app.post("/key", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 });
 
 // TYPE
 app.post("/type", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
@@ -372,25 +370,24 @@ app.post("/type", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 });
 
 // SCROLL
 app.post("/scroll", checkToken, async (req, res) => {
   try {
-
-    if (!page) {
+    if (!page || page.isClosed()) {
       return res.status(400).json({
         error: "Browser not started"
       });
     }
 
-    const amount = Number(req.body.amount || 500);
+    const amount = Number(
+      req.body.amount || 500
+    );
 
     await page.mouse.wheel(0, amount);
 
@@ -399,17 +396,95 @@ app.post("/scroll", checkToken, async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
+  }
+});
 
+// ZOOM
+app.post("/zoom", checkToken, async (req, res) => {
+  try {
+    if (!page || page.isClosed()) {
+      return res.status(400).json({
+        error: "Browser not started"
+      });
+    }
+
+    const amount = Number(
+      req.body.amount || 0
+    );
+
+    const zoom = Math.max(
+      0.5,
+      Math.min(2.5, 1 + amount)
+    );
+
+    await page.evaluate(value => {
+      document.documentElement.style.zoom =
+        String(value);
+    }, zoom);
+
+    res.json({
+      success: true,
+      zoom: zoom
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+// RESET ZOOM
+app.post("/zoom/reset", checkToken, async (req, res) => {
+  try {
+    if (!page || page.isClosed()) {
+      return res.status(400).json({
+        error: "Browser not started"
+      });
+    }
+
+    await page.evaluate(() => {
+      document.documentElement.style.zoom = "1";
+    });
+
+    res.json({
+      success: true,
+      zoom: 1
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+// DOWNLOAD INFO
+app.get("/downloads", checkToken, async (req, res) => {
+  try {
+    if (!context) {
+      return res.json({
+        downloads: []
+      });
+    }
+
+    res.json({
+      downloads: []
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
   }
 });
 
 // SERVER
 app.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `CP Remote Chromium running on port ${PORT}`
+    `CP Powerful Remote Chromium running on port ${PORT}`
   );
 });
