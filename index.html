@@ -1,69 +1,70 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#101827">
-  <title>RUTIK SYSTEM HUB</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RUTIK SYSTEM HUB</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <header class="top">
-      <div class="brand-mark">RH</div>
-      <div class="brand">
-        <h1>RUTIK SYSTEM HUB</h1>
-        <p>IT9020 • Native App Research</p>
-      </div>
-      <div class="version">v0.1</div>
+
+<div class="app">
+
+    <header>
+        <h2>RUTIK SYSTEM HUB</h2>
+        <p>Mobile Application Manager</p>
     </header>
 
-    <main>
-      <section class="hero">
-        <div class="eyebrow">PACKAGE MANAGER</div>
-        <h2>App Installer</h2>
-        <p>Select a package or download one to inspect its format and compatibility.</p>
-      </section>
+    <div class="status">
+        <span class="dot"></span> SYSTEM READY
+    </div>
 
-      <section class="panel">
-        <h3>1. Local package</h3>
-        <label class="button primary" for="fileInput">CHOOSE FILE</label>
-        <input id="fileInput" type="file" accept=".jar,.jad,.pac,.zip,.bin,*/*">
-        <p class="hint">Select a file from phone storage or SD card, if Cloud Phone exposes it.</p>
-      </section>
+    <section>
+        <h3>LOCAL INSTALLER</h3>
+        <p>Select application package</p>
 
-      <section class="panel">
-        <h3>2. Online download</h3>
-        <input id="downloadUrl" class="text-input" type="url" placeholder="https://example.com/app.jar" autocomplete="off">
-        <button id="downloadBtn" class="button secondary">OPEN DOWNLOAD LINK</button>
-        <p class="hint">The link opens in the device browser. Return here and select the downloaded file.</p>
-      </section>
+        <input type="file" id="fileInput">
 
-      <section class="panel">
-        <h3>3. Package report</h3>
-        <div id="emptyState" class="empty">No package selected yet.</div>
-        <div id="report" class="report hidden">
-          <div class="file-title" id="fileName">—</div>
-          <div class="row"><span>Type</span><strong id="fileType">—</strong></div>
-          <div class="row"><span>Size</span><strong id="fileSize">—</strong></div>
-          <div class="row"><span>Format check</span><strong id="fileCheck">—</strong></div>
-          <div class="row"><span>IT9020 status</span><strong id="compatibility">—</strong></div>
+        <button onclick="checkFile()">CHECK PACKAGE</button>
+    </section>
+
+    <section>
+        <h3>ONLINE DOWNLOAD</h3>
+
+        <input type="url" id="downloadUrl"
+        placeholder="Paste download URL">
+
+        <button onclick="downloadFile()">DOWNLOAD</button>
+    </section>
+
+    <section>
+        <h3>PACKAGE INFORMATION</h3>
+        <div id="packageInfo">
+            No package selected.
         </div>
-        <button id="installBtn" class="button install" disabled>INSTALL TO PHONE</button>
-        <p id="installNote" class="notice">Native installation is not connected yet. This button will remain disabled until a supported IT9020 OS installer interface is confirmed.</p>
-      </section>
+    </section>
 
-      <section class="panel reference">
-        <h3>Firmware reference</h3>
-        <p><b>Device:</b> itel IT9020</p>
-        <p><b>Platform:</b> UMS9117 / LS2002</p>
-        <p><b>India PAC:</b> UMS9117_LS2002_it9020_QQVGA_LANG13_IN.pac</p>
-        <p class="hint">Reference only. A firmware PAC is not an app package and must never be flashed from this app.</p>
-      </section>
-    </main>
+    <section>
+        <h3>DEVICE INFORMATION</h3>
+        <p>Device: itel IT9020</p>
+        <p>Screen: 240 × 320</p>
+        <p>Platform: UMS9117</p>
+    </section>
 
-    <footer>RUTIK SYSTEM HUB • Local analysis prototype</footer>
-  </div>
-  <script src="app.js"></script>
+    <button class="install" disabled>
+        INSTALL TO PHONE
+    </button>
+
+    <p class="warning">
+        Native installation support is not verified.
+    </p>
+
+    <footer>
+        RUTIK SYSTEM HUB v1.0
+    </footer>
+
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
